@@ -4,12 +4,6 @@
 <head>
 <meta charset="utf-8">
 <base target="_top">
-<!-- Google Apps Script Deployment Configuration -->
-<script>
-  var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwriNo9j7zEtb4oUp7MHX2rVtWnWQ9BmzFKmqyAZW6_wv0aKN2zDmXxhsfki9_3Cd1K9A/exec';
-  var CORS_PROXY = 'https://cors-anywhere.herokuapp.com/';
-  var USE_PROXY = true; // Set to false if your Apps Script has CORS headers configured
-</script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
@@ -128,10 +122,10 @@ input, select, textarea { font-size: 16px !important; touch-action: manipulation
 
 <script>
 // ============================================================
-// Google Apps Script Smart Connector (CORS-Fixed)
+// Google Apps Script Native Connector (NO CORS NEEDED)
 // ============================================================
 console.log('🚀 Shop Management System Initializing...');
-console.log('📡 Apps Script URL:', APPS_SCRIPT_URL);
+console.log('📍 Running as Google Apps Script Web App');
 
 var _activeReqs = 0;
 function _syncLoadingIcon() {
@@ -145,48 +139,31 @@ function serverCall(fn) {
   _syncLoadingIcon();
   
   return new Promise(function(resolve, reject) {
-    // Check if running inside Google Apps Script
+    // When running as Google Apps Script, use native google.script.run
     if (typeof google !== 'undefined' && google.script && google.script.run) {
-      console.log('📍 Mode: Google Apps Script (Internal)');
+      console.log('✅ Using native Google Apps Script API (NO CORS issues)');
+      console.log('Calling function:', fn, 'with args:', args);
+      
       var runner = google.script.run.withSuccessHandler(function(r) {
-        _activeReqs--; _syncLoadingIcon(); resolve(r);
+        _activeReqs--; 
+        _syncLoadingIcon(); 
+        console.log('✅ Response received:', r);
+        resolve(r);
       }).withFailureHandler(function(e) {
-        _activeReqs--; _syncLoadingIcon(); reject(e);
+        _activeReqs--; 
+        _syncLoadingIcon(); 
+        console.error('❌ Error from Apps Script:', e);
+        reject(e);
       });
+      
       runner[fn].apply(runner, args);
     } else {
-      console.log('🌐 Mode: External (Fetch API)');
-      console.log('Calling function:', fn);
-      
-      var targetUrl = USE_PROXY ? CORS_PROXY + APPS_SCRIPT_URL : APPS_SCRIPT_URL;
-      
-      fetch(targetUrl, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/x-www-form-urlencoded',
-          ...(USE_PROXY && { 'X-Requested-With': 'XMLHttpRequest' })
-        },
-        body: 'action=' + fn + '&data=' + encodeURIComponent(JSON.stringify(args)),
-        mode: USE_PROXY ? 'cors' : 'cors'
-      })
-      .then(function(response) { 
-        if (!response.ok) {
-          throw new Error('HTTP ' + response.status + ': ' + response.statusText);
-        }
-        return response.json(); 
-      })
-      .then(function(data) { 
-        _activeReqs--; 
-        _syncLoadingIcon(); 
-        console.log('✅ Response received:', data);
-        resolve(data); 
-      })
-      .catch(function(error) { 
-        _activeReqs--; 
-        _syncLoadingIcon(); 
-        console.error('❌ Error:', error);
-        reject(error); 
-      });
+      _activeReqs--;
+      _syncLoadingIcon();
+      console.error('❌ NOT running as Google Apps Script Web App');
+      console.error('⚠️ This HTML must be deployed as a Google Apps Script Web App');
+      console.error('📖 See instructions in the README or contact Muks Generation');
+      reject(new Error('Not deployed as Google Apps Script Web App. This file must be used within Google Apps Script.'));
     }
   });
 }
@@ -254,19 +231,14 @@ document.addEventListener('DOMContentLoaded', function() {
       })
       .catch(function(error) {
         console.error('Connection error:', error);
-        showToast('❌ Connection failed. Check console for details.', 'error');
-        statusEl.textContent = '❌ Connection error: ' + (error.message || 'Unknown error');
+        showToast('❌ Connection failed.', 'error');
+        statusEl.innerHTML = '❌ Error: ' + (error.message || 'Unknown error') + '<br><small style="margin-top: 10px; display: block; color: #999;">This file must be deployed as a Google Apps Script Web App, not hosted on GitHub Pages.</small>';
         statusEl.style.color = '#ea4335';
         testBtn.disabled = false;
-        
-        // Provide helpful instructions
-        console.log('%c⚠️ CORS FIX GUIDE', 'font-size: 14px; font-weight: bold; color: #ea4335;');
-        console.log('The CORS proxy (cors-anywhere) may need activation. Visit: https://cors-anywhere.herokuapp.com/');
-        console.log('Alternative: Deploy your HTML as a Google Apps Script Web App instead of GitHub Pages');
       });
   };
   
-  // Auto-trigger test on load (optional)
+  // Auto-trigger test on load
   setTimeout(function() {
     if (typeof testBtn !== 'undefined' && testBtn) {
       testBtn.click();
