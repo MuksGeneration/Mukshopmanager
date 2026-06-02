@@ -7,6 +7,8 @@
 <!-- Google Apps Script Deployment Configuration -->
 <script>
   var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwriNo9j7zEtb4oUp7MHX2rVtWnWQ9BmzFKmqyAZW6_wv0aKN2zDmXxhsfki9_3Cd1K9A/exec';
+  var CORS_PROXY = 'https://cors-anywhere.herokuapp.com/';
+  var USE_PROXY = true; // Set to false if your Apps Script has CORS headers configured
 </script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
@@ -93,7 +95,7 @@ input, select, textarea { font-size: 16px !important; touch-action: manipulation
 #root { width: 100%; height: 100%; }
 
 /* buttons */
-.btn { padding: 10px 20px; border: none; border-radius: 2px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.btn { padding: 10px 20px; border: none; border-radius: 2px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: inline-flex; align-items: center; justify-content: center; }
 .btn-primary { background: var(--navy-primary); color: white; }
 .btn-primary:hover { background: var(--navy-hover); transform: translateY(-2px); }
 .btn-success { background: #34a853; color: white; }
@@ -111,7 +113,7 @@ input, select, textarea { font-size: 16px !important; touch-action: manipulation
 
 /* toast */
 .toast-stack { position: fixed; top: 24px; right: 24px; z-index: 10001; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
-.toast { background: white; border-radius: 4px; box-shadow: 0 4px 18px rgba(0,0,0,0.15); padding: 14px 16px; display: flex; align-items: center; gap: 12px; pointer-events: auto; border-left: 4px solid #ddd; animation: toast-in 0.3s; }
+.toast { background: white; border-radius: 4px; box-shadow: 0 4px 18px rgba(0,0,0,0.15); padding: 14px 16px; display: flex; align-items: center; gap: 12px; pointer-events: auto; border-left: 4px solid #0074D9; }
 .toast.success { border-left-color: #34a853; }
 .toast.success .toast-icon { color: #34a853; }
 .toast.error { border-left-color: #ea4335; }
@@ -126,7 +128,7 @@ input, select, textarea { font-size: 16px !important; touch-action: manipulation
 
 <script>
 // ============================================================
-// Google Apps Script Smart Connector
+// Google Apps Script Smart Connector (CORS-Fixed)
 // ============================================================
 console.log('🚀 Shop Management System Initializing...');
 console.log('📡 Apps Script URL:', APPS_SCRIPT_URL);
@@ -155,17 +157,24 @@ function serverCall(fn) {
     } else {
       console.log('🌐 Mode: External (Fetch API)');
       console.log('Calling function:', fn);
-      var payload = {
-        function: fn,
-        params: args
-      };
       
-      fetch(APPS_SCRIPT_URL, {
+      var targetUrl = USE_PROXY ? CORS_PROXY + APPS_SCRIPT_URL : APPS_SCRIPT_URL;
+      
+      fetch(targetUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'action=' + fn + '&data=' + encodeURIComponent(JSON.stringify(args))
+        headers: { 
+          'Content-Type': 'application/x-www-form-urlencoded',
+          ...(USE_PROXY && { 'X-Requested-With': 'XMLHttpRequest' })
+        },
+        body: 'action=' + fn + '&data=' + encodeURIComponent(JSON.stringify(args)),
+        mode: USE_PROXY ? 'cors' : 'cors'
       })
-      .then(function(response) { return response.json(); })
+      .then(function(response) { 
+        if (!response.ok) {
+          throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+        }
+        return response.json(); 
+      })
       .then(function(data) { 
         _activeReqs--; 
         _syncLoadingIcon(); 
@@ -225,7 +234,7 @@ function showToast(message, type) {
 document.addEventListener('DOMContentLoaded', function() {
   var root = document.getElementById('root');
   
-  root.innerHTML = '<div class="modal" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1001; max-width: 500px;"><div style="background: var(--navy); color: white; padding: 40px; border-radius: 12px; text-align: center;"><h1 style="margin-bottom: 20px; font-size: 28px;">🛒 Shop Management System</h1><p style="margin-bottom: 30px; font-size: 16px; opacity: 0.9;">Connected to your Google Apps Script</p><button id="testBtn" style="background: white; color: var(--navy); padding: 12px 30px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 16px;">✓ Test Connection</button><p id="status" style="margin-top: 20px; font-size: 14px; opacity: 0.8;"></p></div></div>';
+  root.innerHTML = '<div class="modal" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1001; max-width: 500px;"><div style="background: var(--navy); color: white; padding: 20px; border-radius: 4px 4px 0 0;"><h2>Shop Management System</h2></div><div style="padding: 20px;"><p id="status" style="color: #666; margin-bottom: 20px;">Testing connection to Apps Script...</p><button id="testBtn" class="btn btn-primary">Test Connection</button></div></div>';
   
   var testBtn = document.getElementById('testBtn');
   var statusEl = document.getElementById('status');
@@ -249,8 +258,20 @@ document.addEventListener('DOMContentLoaded', function() {
         statusEl.textContent = '❌ Connection error: ' + (error.message || 'Unknown error');
         statusEl.style.color = '#ea4335';
         testBtn.disabled = false;
+        
+        // Provide helpful instructions
+        console.log('%c⚠️ CORS FIX GUIDE', 'font-size: 14px; font-weight: bold; color: #ea4335;');
+        console.log('The CORS proxy (cors-anywhere) may need activation. Visit: https://cors-anywhere.herokuapp.com/');
+        console.log('Alternative: Deploy your HTML as a Google Apps Script Web App instead of GitHub Pages');
       });
   };
+  
+  // Auto-trigger test on load (optional)
+  setTimeout(function() {
+    if (typeof testBtn !== 'undefined' && testBtn) {
+      testBtn.click();
+    }
+  }, 500);
 });
 </script>
 </body>
