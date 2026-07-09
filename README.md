@@ -1,2 +1,2 @@
-# School
+# Shop
 Management system 
